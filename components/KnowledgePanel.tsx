@@ -36,20 +36,26 @@ export default function KnowledgePanel({ onKnowledgeChange }: Props) {
     const file = e.target.files?.[0]
     if (!file) return
     setLoading(true)
-    setStatus('Importing…')
-    const form = new FormData()
-    form.append('file', file)
-    const res = await fetch('/api/knowledge/import', { method: 'POST', body: form })
-    const data = await res.json()
-    setLoading(false)
-    if (res.ok) {
-      setStatus(`✓ Added ${data.added} words, ${data.skipped} skipped`)
-      fetchWords()
-      onKnowledgeChange()
-    } else {
-      setStatus(`Error: ${data.error}`)
+    setStatus(`Importing ${file.name} (${Math.round(file.size / 1024)} KB)…`)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const res = await fetch('/api/knowledge/import', { method: 'POST', body: form })
+      const data = await res.json()
+      if (res.ok) {
+        setStatus(`✓ Added ${data.added} words, ${data.skipped} skipped (${data.total} total in file)`)
+        fetchWords()
+        onKnowledgeChange()
+      } else {
+        setStatus(`Error: ${data.error}`)
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Network error'
+      setStatus(`Failed: ${msg}`)
+    } finally {
+      setLoading(false)
+      e.target.value = ''
     }
-    e.target.value = ''
   }
 
   async function handleReset() {
