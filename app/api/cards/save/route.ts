@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
-import { extractJson, type CardRaw } from '@/lib/ai'
+import { extractJson, type CardRaw } from '@/lib/ai-utils'
 
 // POST /api/cards/save
 // Body: { word: string, rawText: string }
