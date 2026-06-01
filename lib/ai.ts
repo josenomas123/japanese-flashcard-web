@@ -94,7 +94,30 @@ export async function streamOpenAI(word: string, num: number): Promise<ReadableS
   })
 }
 
+export async function streamGemini(word: string, num: number): Promise<ReadableStream<Uint8Array>> {
+  const { GoogleGenerativeAI } = await import('@google/generative-ai')
+  const client = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY!)
+  const model = client.getGenerativeModel({
+    model: process.env.AI_MODEL || 'gemini-1.5-flash',
+  })
+
+  const result = await model.generateContentStream(CARD_PROMPT(word, num))
+
+  const enc = new TextEncoder()
+  return new ReadableStream({
+    async start(controller) {
+      for await (const chunk of result.stream) {
+        const t = chunk.text()
+        if (t) controller.enqueue(enc.encode(t))
+      }
+      controller.close()
+    },
+  })
+}
+
 export async function getStream(word: string, num: number): Promise<ReadableStream<Uint8Array>> {
   const provider = process.env.AI_PROVIDER || 'anthropic'
-  return provider === 'openai' ? streamOpenAI(word, num) : streamClaude(word, num)
+  if (provider === 'openai') return streamOpenAI(word, num)
+  if (provider === 'gemini') return streamGemini(word, num)
+  return streamClaude(word, num)
 }
