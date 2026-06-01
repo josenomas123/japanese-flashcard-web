@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { tokenizeJapanese, isJapanese } from '@/lib/tokenizer'
-import { extractJson } from '@/lib/ai'
 
 interface Props {
   onCardsGenerated: () => void
