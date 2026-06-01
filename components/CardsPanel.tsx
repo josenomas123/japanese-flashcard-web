@@ -56,7 +56,7 @@ export default function CardsPanel() {
     await fetch('/api/cards', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: [...selected] }),
+      body: JSON.stringify({ ids: Array.from(selected) }),
     })
     fetchCards()
   }
