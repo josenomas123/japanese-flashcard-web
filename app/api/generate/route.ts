@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { getStream } from '@/lib/ai'
 
+export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 

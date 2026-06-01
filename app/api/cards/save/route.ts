@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
+
+export const dynamic = 'force-dynamic'
 import { extractJson, type CardRaw } from '@/lib/ai-utils'
 
 // POST /api/cards/save

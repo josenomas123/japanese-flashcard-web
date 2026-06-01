@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 
+export const dynamic = 'force-dynamic'
+
 // POST /api/knowledge/unknown
 // Body: { words: string[] }
 // Returns: { unknown: string[] } — words NOT in the knowledge base

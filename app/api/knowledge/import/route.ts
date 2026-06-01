@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
+
+export const dynamic = 'force-dynamic'
 import { parseVocabFile } from '@/lib/knowledge-parser'
 
 // POST /api/knowledge/import  — multipart form with field "file"
