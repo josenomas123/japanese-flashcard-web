@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #1e1e2e;
+  color: #cdd6f4;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #181825; }
+::-webkit-scrollbar-thumb { background: #45475a; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #6c7086; }
+
+/* Japanese text rendering */
+.jp-text {
+  font-family: "Yu Gothic UI", "Meiryo", "Hiragino Sans", "Noto Sans CJK JP", sans-serif;
+  font-size: 1.1em;
+  line-height: 1.8;
+}
+
+/* ── Component classes ── */
+@layer components {
+  .btn-primary {
+    @apply bg-blue text-crust font-semibold text-sm px-4 py-2 rounded-lg hover:bg-lavender transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply bg-surface text-text text-sm px-3 py-1.5 rounded-lg hover:bg-overlay transition-colors disabled:opacity-40;
+  }
+  .btn-success {
+    @apply bg-green text-crust font-semibold text-sm px-4 py-2 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-danger {
+    @apply bg-red text-crust font-semibold text-sm px-4 py-2 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-ghost {
+    @apply text-subtle text-sm px-3 py-1.5 rounded-lg hover:bg-surface hover:text-text transition-colors;
+  }
+  .input {
+    @apply bg-mantle border border-surface rounded-lg px-3 py-2 text-text placeholder-muted text-sm w-full
+           focus:outline-none focus:border-blue transition-colors;
+  }
+}
+
+/* Anki card HTML preview */
+.card-html ruby rt {
+  font-size: 0.65em;
+  color: #a6adc8;
+}
+
+.card-html b { color: #89b4fa; }
+.card-html i { color: #f9e2af; }
