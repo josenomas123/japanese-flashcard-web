@@ -4,12 +4,14 @@ import { useState } from 'react'
 import KnowledgePanel from '@/components/KnowledgePanel'
 import ClipboardPanel from '@/components/ClipboardPanel'
 import CardsPanel from '@/components/CardsPanel'
+import BatchPanel from '@/components/BatchPanel'
 
-type Tab = 'knowledge' | 'clipboard' | 'cards'
+type Tab = 'knowledge' | 'clipboard' | 'batch' | 'cards'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'knowledge', label: 'Knowledge Base' },
   { id: 'clipboard', label: 'Clipboard Input' },
+  { id: 'batch', label: 'Auto Generate' },
   { id: 'cards', label: 'Generated Cards' },
 ]
 
@@ -29,9 +31,14 @@ export default function Home() {
     setPendingCards(c.cards?.length ?? 0)
   }
 
+  function handleCardsGenerated() {
+    refreshCounts()
+    setTab('cards')
+  }
+
   return (
     <div className="flex flex-col h-screen bg-base">
-      {/* ── Top bar ────────────────────────────────────────────────────────── */}
+      {/* ── Top bar ─────────────────────────────────────────────────────────── */}
       <header className="h-11 flex items-center px-5 gap-3 bg-crust border-b border-surface shrink-0">
         <span className="text-text font-bold text-sm tracking-tight">
           🇯🇵 Japanese Flashcard Builder
@@ -46,7 +53,7 @@ export default function Home() {
         </span>
       </header>
 
-      {/* ── Tab bar ────────────────────────────────────────────────────────── */}
+      {/* ── Tab bar ─────────────────────────────────────────────────────────── */}
       <nav className="flex gap-px bg-mantle border-b border-surface shrink-0">
         {TABS.map(({ id, label }) => (
           <button
@@ -70,20 +77,16 @@ export default function Home() {
         ))}
       </nav>
 
-      {/* ── Panel content ──────────────────────────────────────────────────── */}
-      <main className="flex-1 overflow-hidden p-5">
+      {/* ── Panel content ───────────────────────────────────────────────────── */}
+      <main className="flex-1 overflow-y-auto p-5">
         {tab === 'knowledge' && (
-          <KnowledgePanel
-            onKnowledgeChange={refreshCounts}
-          />
+          <KnowledgePanel onKnowledgeChange={refreshCounts} />
         )}
         {tab === 'clipboard' && (
-          <ClipboardPanel
-            onCardsGenerated={() => {
-              refreshCounts()
-              setTab('cards')
-            }}
-          />
+          <ClipboardPanel onCardsGenerated={handleCardsGenerated} />
+        )}
+        {tab === 'batch' && (
+          <BatchPanel onCardsGenerated={handleCardsGenerated} />
         )}
         {tab === 'cards' && <CardsPanel />}
       </main>

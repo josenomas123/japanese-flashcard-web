@@ -41,10 +41,53 @@ export type CardRaw = {
   back_definition: string
 }
 
+export type BatchCardRaw = CardRaw & { word: string }
+
 export function extractJson(text: string): CardRaw[] {
   const clean = text.replace(/```(?:json)?\s*/g, '').replace(/```\s*$/g, '').trim()
   const start = clean.indexOf('[')
   const end = clean.lastIndexOf(']')
   if (start === -1 || end === -1) throw new Error('No JSON array in response')
   return JSON.parse(clean.slice(start, end + 1))
+}
+
+export const BATCH_PROMPT = (count: number, level: string, knownWords: string[]) => {
+  const avoidList = knownWords.length
+    ? `WORDS TO AVOID (already in user's knowledge base — do NOT use as target words):\n${knownWords.join('、')}\n`
+    : ''
+  const levelGuide =
+    level === 'mixed'
+      ? 'Mix of JLPT N3, N2, and N1 vocabulary.'
+      : `Focus on JLPT ${level} vocabulary.`
+
+  return `\
+You are a Japanese vocabulary flashcard generator.
+
+Generate exactly ${count} Japanese vocabulary flashcard sets.
+${avoidList}
+LEVEL: ${levelGuide}
+Vary the vocabulary types: verbs, nouns, i-adjectives, na-adjectives, expressions.
+
+OUTPUT FORMAT — return a valid JSON array only, no markdown fences.
+Each element must have EXACTLY these four fields:
+
+"word"            — The target Japanese word in its dictionary/kanji form.
+"front"           — One natural Japanese example sentence. Mark the target word as 【word】.
+                    All other vocabulary must be simple (JLPT N5–N4 level or everyday words).
+"back_furigana"   — The complete sentence with HTML <ruby> tags for ALL kanji readings.
+                    Then <br><b>word</b>【reading in hiragana】(Pitch: pattern)
+"back_definition" — HTML definition: <b>word【reading】</b><br><i>part of speech</i><br>
+                    ① meaning<br>② second meaning (if any)<br>JLPT Nx
+
+EXAMPLE:
+[
+  {
+    "word": "驚く",
+    "front": "その知らせに【驚いた】。",
+    "back_furigana": "その<ruby>知<rt>し</rt></ruby>らせに<ruby>驚<rt>おどろ</rt></ruby>いた。<br><b>驚く</b>【おどろく】(Pitch: LHHL)",
+    "back_definition": "<b>驚く【おどろく】</b><br><i>verb (godan)</i><br>① to be surprised, to be astonished<br>JLPT N3"
+  }
+]
+
+Generate ${count} unique flashcard sets now.`
 }
