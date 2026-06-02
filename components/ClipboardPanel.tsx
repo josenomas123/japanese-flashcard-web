@@ -1,80 +1,83 @@
 'use client'
 
-import { useState } from 'react'
-import { tokenizeJapanese, isJapanese } from '@/lib/tokenizer'
+import { useRef, useState } from 'react'
+import { tokenizeJapanese } from '@/lib/tokenizer'
 
 interface Props {
   onCardsGenerated: () => void
 }
 
-type WordState = { word: string; selected: boolean }
 type GenState = 'idle' | 'generating' | 'saving'
 
+interface WordEntry {
+  word: string
+  selected: boolean
+}
+
 export default function ClipboardPanel({ onCardsGenerated }: Props) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [text, setText] = useState('')
-  const [words, setWords] = useState<WordState[]>([])
+  const [selectedWord, setSelectedWord] = useState('')
+  const [unknownWords, setUnknownWords] = useState<WordEntry[]>([])
   const [numSentences, setNumSentences] = useState(10)
   const [genState, setGenState] = useState<GenState>('idle')
   const [currentWord, setCurrentWord] = useState('')
   const [progress, setProgress] = useState({ done: 0, total: 0 })
   const [log, setLog] = useState<string[]>([])
 
-  async function readClipboard() {
-    try {
-      const t = await navigator.clipboard.readText()
-      setText(t)
-      analyzeText(t)
-    } catch {
-      setLog(['Could not read clipboard. Use HTTPS or paste manually.'])
+  // ── Word selection detection ────────────────────────────────────────────────
+  function captureSelection() {
+    const ta = textareaRef.current
+    if (!ta) return
+    const sel = ta.value.slice(ta.selectionStart, ta.selectionEnd).trim()
+    // Accept selections up to 20 chars (covers most Japanese words + phrases)
+    if (sel.length > 0 && sel.length <= 20) {
+      setSelectedWord(sel)
     }
   }
 
-  function analyzeText(t = text) {
-    if (!t.trim()) return
-    const tokens = tokenizeJapanese(t)
-    setWords(tokens.map((w) => ({ word: w, selected: false })))
-    setLog([])
+  // ── Clipboard ───────────────────────────────────────────────────────────────
+  async function pasteClipboard() {
+    try {
+      const t = await navigator.clipboard.readText()
+      setText(t)
+      textareaRef.current?.focus()
+    } catch {
+      setLog(['Could not read clipboard — use HTTPS or paste manually (Ctrl+V).'])
+    }
   }
 
-  async function filterUnknown() {
-    if (!words.length) return
-    const wordList = words.map((w) => w.word)
+  // ── Analyze unknown words ───────────────────────────────────────────────────
+  async function analyzeUnknown() {
+    if (!text.trim()) return
+    const tokens = tokenizeJapanese(text)
+    if (!tokens.length) {
+      setUnknownWords([])
+      setLog(['No Japanese words detected.'])
+      return
+    }
     const res = await fetch('/api/knowledge/unknown', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ words: wordList }),
+      body: JSON.stringify({ words: tokens }),
     })
     const data = await res.json()
-    const unknownSet = new Set<string>(data.unknown ?? [])
-    setWords((prev) =>
-      prev.filter((w) => unknownSet.has(w.word)).map((w) => ({ ...w, selected: true }))
-    )
-    setLog([`Showing ${unknownSet.size} unknown words`])
+    const unknown: string[] = data.unknown ?? []
+    setUnknownWords(unknown.map((w) => ({ word: w, selected: true })))
+    setLog([`Found ${unknown.length} unknown word${unknown.length !== 1 ? 's' : ''} out of ${tokens.length} detected.`])
   }
 
-  function toggleWord(word: string) {
-    setWords((prev) =>
-      prev.map((w) => (w.word === word ? { ...w, selected: !w.selected } : w))
-    )
-  }
-
-  function selectAll()  { setWords((p) => p.map((w) => ({ ...w, selected: true }))) }
-  function selectNone() { setWords((p) => p.map((w) => ({ ...w, selected: false }))) }
-
-  async function generateCards() {
-    const selected = words.filter((w) => w.selected).map((w) => w.word)
-    if (!selected.length) { setLog(['Select at least one word.']); return }
-
+  // ── Core: generate card(s) for a list of words ──────────────────────────────
+  async function generateForWords(words: string[]) {
+    if (!words.length) return
     setGenState('generating')
-    setProgress({ done: 0, total: selected.length })
+    setProgress({ done: 0, total: words.length })
     setLog([])
 
-    for (const word of selected) {
+    for (const word of words) {
       setCurrentWord(word)
       setLog((l) => [...l, `Generating: ${word}…`])
-
       try {
-        // 1. Stream AI response
         const res = await fetch('/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -91,7 +94,6 @@ export default function ClipboardPanel({ onCardsGenerated }: Props) {
           rawText += dec.decode(value, { stream: true })
         }
 
-        // 2. Save parsed cards to DB
         setGenState('saving')
         const saveRes = await fetch('/api/cards/save', {
           method: 'POST',
@@ -108,86 +110,149 @@ export default function ClipboardPanel({ onCardsGenerated }: Props) {
         const msg = err instanceof Error ? err.message : 'Unknown error'
         setLog((l) => [...l.slice(0, -1), `✗ ${word}: ${msg}`])
       }
+      setGenState('generating')
     }
 
     setGenState('idle')
     setCurrentWord('')
   }
 
-  const selectedCount = words.filter((w) => w.selected).length
+  function generateSelected() {
+    const words = unknownWords.filter((w) => w.selected).map((w) => w.word)
+    generateForWords(words)
+  }
+
+  function generateQuick() {
+    if (selectedWord) generateForWords([selectedWord])
+  }
+
+  function toggleWord(word: string) {
+    setUnknownWords((prev) =>
+      prev.map((w) => (w.word === word ? { ...w, selected: !w.selected } : w))
+    )
+  }
+
   const busy = genState !== 'idle'
+  const selectedCount = unknownWords.filter((w) => w.selected).length
 
   return (
-    <div className="flex flex-col gap-4 h-full">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <span className="text-blue text-xs font-semibold tracking-widest uppercase">Clipboard Input</span>
+    <div className="flex flex-col gap-3 h-full">
+
+      {/* Header row */}
+      <div className="flex items-center gap-3 shrink-0">
+        <span className="text-blue text-xs font-semibold tracking-widest uppercase">Notes</span>
+        <span className="text-muted text-xs">Select any word → quick flashcard · or analyze all unknown words</span>
+        <div className="flex-1" />
+        <button className="btn-secondary text-xs px-3 py-1.5" onClick={pasteClipboard}>
+          📋 Paste Clipboard
+        </button>
       </div>
 
-      {/* Main area: textarea + word list side by side */}
-      <div className="flex gap-4 flex-1 min-h-0">
-        {/* Left: text input */}
-        <div className="flex flex-col gap-2 flex-1 min-w-0">
-          <div className="flex gap-2">
-            <button className="btn-secondary text-sm" onClick={readClipboard}>
-              Read Clipboard
-            </button>
-            <button className="btn-secondary text-sm" onClick={() => analyzeText()}>
-              Analyze
-            </button>
-            <button className="btn-secondary text-sm" onClick={filterUnknown} disabled={!words.length}>
-              Filter Unknown
-            </button>
-          </div>
+      {/* Main area */}
+      <div className="flex gap-3 flex-1 min-h-0">
+
+        {/* ── Left: Notes textarea ───────────────────────────────────────────── */}
+        <div className="flex flex-col flex-1 min-w-0 gap-2">
+
+          {/* Selected word pill */}
+          {selectedWord ? (
+            <div className="flex items-center gap-2 bg-blue/10 border border-blue/30 rounded-lg px-3 py-2">
+              <span className="text-muted text-xs">Selected:</span>
+              <span className="jp-text text-blue font-bold text-lg">{selectedWord}</span>
+              <button
+                className="text-muted hover:text-text text-xs ml-1"
+                onClick={() => setSelectedWord('')}
+              >✕</button>
+              <div className="flex-1" />
+              <span className="text-muted text-xs">{numSentences} sentences</span>
+              <button
+                onClick={generateQuick}
+                disabled={busy}
+                className="btn-success text-sm px-4 py-1.5 disabled:opacity-40"
+              >
+                ⚡ Generate Card
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 bg-mantle border border-surface rounded-lg px-3 py-2 text-muted text-xs">
+              <span>💡 Double-click a word or highlight text to get a quick flashcard</span>
+            </div>
+          )}
+
+          {/* Textarea */}
           <textarea
-            className="input flex-1 resize-none jp-text text-base"
-            placeholder="Copy Japanese text anywhere on your system… or paste / type here."
+            ref={textareaRef}
+            className="input flex-1 resize-none jp-text text-base leading-relaxed"
+            placeholder={
+              'Paste or type Japanese text here…\n\n' +
+              '• Double-click any word to select it\n' +
+              '• Or highlight a word/phrase\n' +
+              '• Then click ⚡ Generate Card above\n\n' +
+              'You can also click Analyze to find all unknown words.'
+            }
             value={text}
             onChange={(e) => setText(e.target.value)}
+            onMouseUp={captureSelection}
+            onKeyUp={captureSelection}
+            onDoubleClick={captureSelection}
           />
         </div>
 
-        {/* Right: word list */}
-        <div className="flex flex-col gap-2 w-56 shrink-0">
+        {/* ── Right: Unknown words panel ─────────────────────────────────────── */}
+        <div className="flex flex-col w-52 shrink-0 gap-2">
           <div className="flex items-center justify-between">
-            <span className="text-subtle text-xs">Words found</span>
-            <span className="text-muted text-xs">{words.length}</span>
+            <span className="text-subtle text-xs font-semibold uppercase tracking-wider">Unknown Words</span>
+            <span className="text-muted text-xs">{unknownWords.length}</span>
           </div>
-          <div className="flex gap-1">
-            <button className="btn-ghost text-xs px-2 py-1" onClick={selectAll}>All</button>
-            <button className="btn-ghost text-xs px-2 py-1" onClick={selectNone}>None</button>
-          </div>
+
+          <button
+            className="btn-secondary text-xs py-1.5"
+            onClick={analyzeUnknown}
+            disabled={!text.trim() || busy}
+          >
+            Analyze Text
+          </button>
+
           <div className="flex-1 overflow-y-auto rounded-lg border border-surface bg-mantle">
-            {words.length === 0 ? (
-              <div className="p-3 text-center text-muted text-xs">No words yet</div>
+            {unknownWords.length === 0 ? (
+              <div className="p-3 text-center text-muted text-xs leading-relaxed">
+                Click Analyze<br />to find unknown<br />words in your text
+              </div>
             ) : (
-              words.map(({ word, selected }) => (
+              unknownWords.map(({ word, selected }) => (
                 <button
                   key={word}
                   onClick={() => toggleWord(word)}
-                  className={`w-full text-left px-3 py-2 jp-text text-sm transition-colors
-                    ${selected
-                      ? 'bg-blue/20 text-blue'
-                      : 'text-subtle hover:bg-surface/50'
-                    }`}
+                  className={`w-full text-left px-3 py-2 jp-text text-sm transition-colors border-b border-surface/50 last:border-0
+                    ${selected ? 'bg-blue/15 text-blue' : 'text-subtle hover:bg-surface/50'}`}
                 >
-                  {selected ? '✓ ' : '○ '}{word}
+                  <span className="mr-1.5 text-xs">{selected ? '☑' : '☐'}</span>
+                  {word}
                 </button>
               ))
             )}
           </div>
-          <span className="text-xs text-muted text-center">{selectedCount} selected</span>
+
+          {unknownWords.length > 0 && (
+            <div className="flex gap-1">
+              <button
+                className="btn-ghost text-xs px-2 py-1 flex-1"
+                onClick={() => setUnknownWords((p) => p.map((w) => ({ ...w, selected: true })))}
+              >All</button>
+              <button
+                className="btn-ghost text-xs px-2 py-1 flex-1"
+                onClick={() => setUnknownWords((p) => p.map((w) => ({ ...w, selected: false })))}
+              >None</button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Generation controls */}
-      <div className="border-t border-surface pt-3 flex items-center gap-3">
+      {/* ── Bottom controls ───────────────────────────────────────────────────── */}
+      <div className="border-t border-surface pt-3 flex flex-wrap items-center gap-3 shrink-0">
         <label className="text-subtle text-sm whitespace-nowrap">Sentences/word:</label>
         <input
-          type="number"
-          min={1}
-          max={20}
-          value={numSentences}
+          type="number" min={1} max={20} value={numSentences}
           onChange={(e) => setNumSentences(Number(e.target.value))}
           className="input w-16 text-center py-1"
           disabled={busy}
@@ -195,7 +260,7 @@ export default function ClipboardPanel({ onCardsGenerated }: Props) {
         <div className="flex-1" />
         <button
           className="btn-success"
-          onClick={generateCards}
+          onClick={generateSelected}
           disabled={busy || selectedCount === 0}
         >
           {busy
@@ -204,17 +269,19 @@ export default function ClipboardPanel({ onCardsGenerated }: Props) {
         </button>
       </div>
 
-      {/* Progress + log */}
+      {/* Progress bar */}
       {busy && (
-        <div className="h-1.5 bg-surface rounded-full overflow-hidden">
+        <div className="h-1.5 bg-surface rounded-full overflow-hidden shrink-0">
           <div
             className="h-full bg-blue transition-all duration-300"
-            style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }}
+            style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 10}%` }}
           />
         </div>
       )}
+
+      {/* Log */}
       {log.length > 0 && (
-        <div className="bg-mantle rounded-lg border border-surface p-3 space-y-1 max-h-28 overflow-y-auto">
+        <div className="bg-mantle rounded-lg border border-surface p-3 space-y-1 max-h-24 overflow-y-auto shrink-0">
           {log.map((l, i) => (
             <p key={i} className="text-xs font-mono text-subtle">{l}</p>
           ))}
