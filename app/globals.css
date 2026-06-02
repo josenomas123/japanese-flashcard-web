@@ -49,8 +49,9 @@ html, body {
     @apply text-subtle text-sm px-3 py-1.5 rounded-lg hover:bg-surface hover:text-text transition-colors;
   }
   .input {
-    @apply bg-mantle border border-surface rounded-lg px-3 py-2 text-text placeholder-muted text-sm w-full
+    @apply bg-mantle border border-surface rounded-lg px-3 py-2 placeholder-muted text-sm w-full
            focus:outline-none focus:border-blue transition-colors;
+    color: #ffffff;
   }
 }
 

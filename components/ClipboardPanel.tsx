@@ -182,7 +182,8 @@ export default function ClipboardPanel({ onCardsGenerated }: Props) {
           {/* Textarea */}
           <textarea
             ref={textareaRef}
-            className="input flex-1 resize-none jp-text text-base leading-relaxed text-white caret-white"
+            style={{ color: '#ffffff', caretColor: '#ffffff' }}
+            className="input flex-1 resize-none jp-text text-base leading-relaxed"
             placeholder={
               'Paste or type Japanese text here…\n\n' +
               '• Double-click any word to select it\n' +
