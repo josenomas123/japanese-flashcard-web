@@ -6,7 +6,7 @@ import { CARD_PROMPT } from './ai-utils'
 export async function getStream(word: string, num: number): Promise<ReadableStream<Uint8Array>> {
   const client = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY!)
   const model = client.getGenerativeModel({
-    model: process.env.AI_MODEL || 'gemini-1.5-flash',
+    model: process.env.AI_MODEL || 'gemini-2.0-flash',
   })
 
   const result = await model.generateContentStream(CARD_PROMPT(word, num))

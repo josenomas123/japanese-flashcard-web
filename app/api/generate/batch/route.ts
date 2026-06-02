@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     // Generate with Gemini
     const client = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY!)
     const model = client.getGenerativeModel({
-      model: process.env.AI_MODEL || 'gemini-1.5-flash',
+      model: process.env.AI_MODEL || 'gemini-2.0-flash',
     })
 
     const prompt = BATCH_PROMPT(safeCount, level, knownWords.slice(0, 300))
